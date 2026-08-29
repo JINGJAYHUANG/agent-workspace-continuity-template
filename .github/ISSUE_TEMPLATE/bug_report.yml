@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a reproducible continuity, privacy, or compatibility defect.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, raw transcripts, personal paths, or private project state.
+  - type: input
+    id: version
+    attributes:
+      label: AWC version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform family
+      options: [Windows, macOS, Linux, WSL, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal synthetic reproduction
+      description: Use a temporary workspace and synthetic names.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
