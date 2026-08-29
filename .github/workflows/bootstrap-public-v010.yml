@@ -1,0 +1,98 @@
+name: Bootstrap public v0.1.0
+
+on:
+  push:
+    branches: ["feat/public-v0.1.0"]
+    paths:
+      - ".bootstrap/trigger.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: awc-public-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: ""
+
+      - name: Reconstruct and verify source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/source.tar.xz.b64.part-* | base64 --decode > "$RUNNER_TEMP/source.tar.xz"
+          printf '%s  %s\n' \
+            'b3475eeb95b0aa2c9f08dffea7a01e74bb108b3c1dae212ea6e90ec7bfa7edd0' \
+            "$RUNNER_TEMP/source.tar.xz" | sha256sum -c -
+
+      - name: Safely extract source
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ARCHIVE="$RUNNER_TEMP/source.tar.xz"
+          export STAGE="$RUNNER_TEMP/public-source"
+          python - <<'PY'
+          import os
+          import tarfile
+          from pathlib import Path
+
+          archive = Path(os.environ["ARCHIVE"])
+          stage = Path(os.environ["STAGE"])
+          stage.mkdir(parents=True, exist_ok=True)
+          with tarfile.open(archive, "r:xz") as bundle:
+              members = bundle.getmembers()
+              for member in members:
+                  path = Path(member.name)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"unsafe archive member: {member.name}")
+                  if member.issym() or member.islnk():
+                      raise SystemExit(f"links are not allowed: {member.name}")
+              bundle.extractall(stage, filter="data")
+          PY
+
+      - name: Run release gate on extracted source
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/public-source"
+          python -m pip install --disable-pip-version-check pytest==9.0.2
+          PYTHONPATH="$stage/src" python -m compileall -q "$stage/src" "$stage/scripts" "$stage/tests"
+          PYTHONPATH="$stage/src" python -m pytest -q "$stage/tests"
+          (cd "$stage" && PYTHONPATH=src python scripts/validate_release.py --skip-tests)
+
+      - name: Install verified non-workflow source
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/public-source"
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='.bootstrap/' \
+            --exclude='.github/workflows/' \
+            "$stage/" ./
+          git status --short
+
+      - name: Commit verified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: publish verified agent workspace continuity source"
+          git push origin HEAD:feat/public-v0.1.0
