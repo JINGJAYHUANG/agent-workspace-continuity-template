@@ -1,0 +1,5 @@
+# Local continuity state: never commit these paths.
+local/
+logs/
+backups/
+runtime-snapshot.json

@@ -1,0 +1,7 @@
+include README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md
+recursive-include src/agent_workspace_continuity/template_data *
+recursive-include docs *.md *.svg
+recursive-include examples *.md *.py *.json *.gitignore
+recursive-include tests *.py
+recursive-include scripts *.py *.sh *.ps1
+include pyproject.toml setup.py
