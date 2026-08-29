@@ -1,1 +1,0 @@
-bootstrap agent-workspace-continuity-template v0.1.0 retry-3
